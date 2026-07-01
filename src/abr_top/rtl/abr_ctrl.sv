@@ -644,7 +644,7 @@ always_comb kv_mlkem_msg_write_data = '0;
      end else if (zeroize) begin
 	   trigger <= 0;	
      end else begin
-	   if(meas_cycle == abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
+	   if(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
 		  trigger <= 1;
 	   if(mldsa_signature_done)
 		  trigger <= 0;
