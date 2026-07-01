@@ -1,5 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 `include "abr_sva.svh"
 
 module abr_1r1w_ram #(
@@ -18,17 +29,17 @@ module abr_1r1w_ram #(
     output logic [DATA_WIDTH-1:0]    rdata_o
 );
 
-    // ✅ CRITICAL: doğru memory form
+   
     (* ram_style = "block" *)
     logic [DATA_WIDTH-1:0] ram [0:DEPTH-1];
 
-    // ✅ write
+  
     always_ff @(posedge clk_i) begin
         if (we_i)
             ram[waddr_i] <= wdata_i;
     end
 
-    // ✅ BRAM-friendly read (NO ELSE!)
+ 
     always_ff @(posedge clk_i) begin
         if (re_i)
             rdata_o <= ram[raddr_i];

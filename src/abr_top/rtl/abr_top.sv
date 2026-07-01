@@ -43,7 +43,7 @@ module abr_top
   input logic rst_b,
 
 `ifdef RV_FPGA_SCA
-  output wire NTT_trigger,
+  output NTT_trigger,
   output wire PWM_trigger,
   output wire PWA_trigger,
   output wire INTT_trigger,
@@ -367,11 +367,11 @@ logic [63:0] rel_cycle;
   logic [ABR_NUM_NTT-1:0] ntt_sib_rd_detect;
   logic [ABR_NUM_NTT-1:0] ntt_sib_rd_detect_d1;
 
-  //memory interfaces
- // abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank0_mem_if();
- // abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank1_mem_if();
- //abr_sram_be_if #(.ADDR_W(SIG_Z_MEM_ADDR_W), .DATA_W(SIG_Z_MEM_DATA_W)) sig_z_mem_if();
- // abr_sram_be_if #(.ADDR_W(PK_MEM_ADDR_W), .DATA_W(PK_MEM_DATA_W)) pk_mem_if();
+   //memory interfaces
+   //abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank0_mem_if();
+   //abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank1_mem_if();
+   //abr_sram_be_if #(.ADDR_W(SIG_Z_MEM_ADDR_W), .DATA_W(SIG_Z_MEM_DATA_W)) sig_z_mem_if();
+   // abr_sram_be_if #(.ADDR_W(PK_MEM_ADDR_W), .DATA_W(PK_MEM_DATA_W)) pk_mem_if();
 
 
   logic                     sk_bank0_mem_we_i;
@@ -388,40 +388,33 @@ logic [63:0] rel_cycle;
   logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank1_mem_raddr_i;
   logic [SK_MEM_BANK_DATA_W-1:0] sk_bank1_mem_rdata_o;
 
-
-
   logic                     sig_z_mem_we_i;
   logic [SIG_Z_MEM_ADDR_W-1:0] sig_z_mem_waddr_i;
- // logic [(SIG_Z_MEM_DATA_W/SIG_Z_MEM_WSTROBE_W)-1:0][SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wdata_i;
+  //logic [(SIG_Z_MEM_DATA_W/SIG_Z_MEM_WSTROBE_W)-1:0][SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wdata_i;
   //logic [SIG_Z_MEM_NUM_DWORD-1:0][31:0] sig_z_mem_wdata_i;
   //logic [(SIG_Z_MEM_DATA_W/SIG_Z_MEM_WSTROBE_W)-1:0] sig_z_mem_wstrobe_i;
-//  logic [SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wstrobe_i;
+  //logic [SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wstrobe_i;
   logic                     sig_z_mem_re_i;
   logic [SIG_Z_MEM_ADDR_W-1:0] sig_z_mem_raddr_i;
   logic [SIG_Z_MEM_DATA_W-1:0] sig_z_mem_rdata_o;
   //logic [SIG_Z_MEM_NUM_DWORD-1:0][31:0] sig_z_mem_rdata_o;
+  logic [(SIG_Z_MEM_DATA_W/8)-1:0][7:0] sig_z_mem_wdata_i;
+  logic [(SIG_Z_MEM_DATA_W/8)-1:0]      sig_z_mem_wstrobe_i;
 
-
-logic [(SIG_Z_MEM_DATA_W/8)-1:0][7:0] sig_z_mem_wdata_i;
-logic [(SIG_Z_MEM_DATA_W/8)-1:0]      sig_z_mem_wstrobe_i;
-
-logic [(PK_MEM_DATA_W/8)-1:0][7:0]    pk_mem_wdata_i;
-logic [(PK_MEM_DATA_W/8)-1:0]         pk_mem_wstrobe_i;
-
-
-
+  logic [(PK_MEM_DATA_W/8)-1:0][7:0]    pk_mem_wdata_i;
+  logic [(PK_MEM_DATA_W/8)-1:0]         pk_mem_wstrobe_i;
   logic                     pk_mem_we_i;
   logic [PK_MEM_ADDR_W-1:0] pk_mem_waddr_i;
-//  logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0][PK_MEM_WSTROBE_W-1:0] pk_mem_wdata_i;
+  //logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0][PK_MEM_WSTROBE_W-1:0] pk_mem_wdata_i;
   //logic [(PK_MEM_NUM_DWORDS)-1:0][31:0] pk_mem_wdata_i;
-//  logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0] pk_mem_wstrobe_i;
+  //logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0] pk_mem_wstrobe_i;
   //logic  [(PK_MEM_WSTROBE_W)-1:0] pk_mem_wstrobe_i;
   logic                     pk_mem_re_i;
   logic [PK_MEM_ADDR_W-1:0] pk_mem_raddr_i;
   logic [PK_MEM_DATA_W-1:0] pk_mem_rdata_o;  
   //logic [(PK_MEM_NUM_DWORDS)-1:0][31:0] pk_mem_rdata_o;
 
-
+  logic [63:0] meas_cycle;
 
 
   logic [1:0][ABR_MEM_DATA_WIDTH-1:0] splitter_rand;
@@ -684,7 +677,8 @@ abr_ctrl_inst
   .error_intr(error_intr),
   .notif_intr(notif_intr),
   .debugUnlock_or_scan_mode_switch(debugUnlock_or_scan_mode_switch),
-  .trigger(trigger)
+  .trigger(trigger),
+  .meas_cycle(meas_cycle)
 );
 
 always_comb zeroize_mem_we = (zeroize_mem.rd_wr_en == RW_WRITE);
@@ -887,7 +881,7 @@ generate
   ntt_top_inst (
     .clk(clk),
     .reset_n(rst_b),
-    .zeroize(zeroize_reg),
+    .zeroize(zeroize_reg || meas_cycle==36891), //sampler in ball -> NTT -> zeroize -> PWM -> INTT
 
     .mode(mode[g_inst]),
     .ntt_enable(ntt_enable[g_inst]),
