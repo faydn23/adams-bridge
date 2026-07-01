@@ -63,7 +63,7 @@ module abr_top
   output logic                      hreadyout_o,
   output logic [AHB_DATA_WIDTH-1:0] hrdata_o,
 
-  abr_mem_if.req                  abr_memory_export,
+  //abr_mem_if.req                  abr_memory_export,
 
   `ifdef CALIPTRA
   // KV interface
@@ -81,10 +81,16 @@ module abr_top
   output logic                      busy_o,
 
   output logic                      error_intr,
-  output logic                      notif_intr
-
+  output logic                      notif_intr,
+  output logic                      trigger
 
   );
+
+
+logic busy_d;
+logic [63:0] rel_cycle;
+
+
 
 //Signal Declarations
   localparam ABR_NUM_NTT = MASKING_EN ? 2 : 1;
@@ -123,7 +129,7 @@ module abr_top
   ntt_mem_addr_t [ABR_NUM_NTT-1:0] ntt_mem_base_addr;
   pwo_mem_addr_t [ABR_NUM_NTT-1:0] pwo_mem_base_addr;
 
-  // Controller outputs — single command set
+  // Controller outputs â single command set
   abr_ntt_mode_e ntt_mode_ctrl;
   logic ntt_enable_ctrl;
   ntt_mem_addr_t ntt_mem_base_addr_ctrl;
@@ -156,6 +162,7 @@ module abr_top
   logic [ABR_NUM_NTT-1:0] pwm_b_rd_data_valid;
   logic [ABR_NUM_NTT-1:0] ntt_busy;
   logic [ABR_NUM_NTT-1:0] ntt_done;
+  logic [ABR_NUM_NTT-1:0] ntt_random_en;
   logic [ABR_NUM_NTT-1:0] ntt_shuffling_en;
 
   mem_if_t w1_mem_wr_req;
@@ -304,7 +311,7 @@ module abr_top
   logic zeroize_mem_re;
   logic [ABR_MEM_ADDR_WIDTH-1:0] zeroize_mem_addr;
     
-  //Memory interface decode — [ABR_NUM_NTT-1:0] outermost: [0]=regular, [1]=masked
+  //Memory interface decode â [ABR_NUM_NTT-1:0] outermost: [0]=regular, [1]=masked
   logic [ABR_NUM_NTT-1:0][2:1] abr_mem_re;
   logic [ABR_NUM_NTT-1:0][2:1][ABR_MEM_ADDR_WIDTH-4:0] abr_mem_raddr;
   logic [ABR_NUM_NTT-1:0][2:1][ABR_MEM_DATA_WIDTH-1:0] abr_mem_rdata;
@@ -361,10 +368,61 @@ module abr_top
   logic [ABR_NUM_NTT-1:0] ntt_sib_rd_detect_d1;
 
   //memory interfaces
-  abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank0_mem_if();
-  abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank1_mem_if();
-  abr_sram_be_if #(.ADDR_W(SIG_Z_MEM_ADDR_W), .DATA_W(SIG_Z_MEM_DATA_W)) sig_z_mem_if();
-  abr_sram_be_if #(.ADDR_W(PK_MEM_ADDR_W), .DATA_W(PK_MEM_DATA_W)) pk_mem_if();
+ // abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank0_mem_if();
+ // abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank1_mem_if();
+ //abr_sram_be_if #(.ADDR_W(SIG_Z_MEM_ADDR_W), .DATA_W(SIG_Z_MEM_DATA_W)) sig_z_mem_if();
+ // abr_sram_be_if #(.ADDR_W(PK_MEM_ADDR_W), .DATA_W(PK_MEM_DATA_W)) pk_mem_if();
+
+
+  logic                     sk_bank0_mem_we_i;
+  logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank0_mem_waddr_i;
+  logic [SK_MEM_BANK_DATA_W-1:0]sk_bank0_mem_wdata_i;
+  logic                     sk_bank0_mem_re_i;
+  logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank0_mem_raddr_i;
+  logic [SK_MEM_BANK_DATA_W-1:0] sk_bank0_mem_rdata_o;
+
+  logic                     sk_bank1_mem_we_i;
+  logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank1_mem_waddr_i;
+  logic [SK_MEM_BANK_DATA_W-1:0]sk_bank1_mem_wdata_i;
+  logic                     sk_bank1_mem_re_i;
+  logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank1_mem_raddr_i;
+  logic [SK_MEM_BANK_DATA_W-1:0] sk_bank1_mem_rdata_o;
+
+
+
+  logic                     sig_z_mem_we_i;
+  logic [SIG_Z_MEM_ADDR_W-1:0] sig_z_mem_waddr_i;
+ // logic [(SIG_Z_MEM_DATA_W/SIG_Z_MEM_WSTROBE_W)-1:0][SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wdata_i;
+  //logic [SIG_Z_MEM_NUM_DWORD-1:0][31:0] sig_z_mem_wdata_i;
+  //logic [(SIG_Z_MEM_DATA_W/SIG_Z_MEM_WSTROBE_W)-1:0] sig_z_mem_wstrobe_i;
+//  logic [SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wstrobe_i;
+  logic                     sig_z_mem_re_i;
+  logic [SIG_Z_MEM_ADDR_W-1:0] sig_z_mem_raddr_i;
+  logic [SIG_Z_MEM_DATA_W-1:0] sig_z_mem_rdata_o;
+  //logic [SIG_Z_MEM_NUM_DWORD-1:0][31:0] sig_z_mem_rdata_o;
+
+
+logic [(SIG_Z_MEM_DATA_W/8)-1:0][7:0] sig_z_mem_wdata_i;
+logic [(SIG_Z_MEM_DATA_W/8)-1:0]      sig_z_mem_wstrobe_i;
+
+logic [(PK_MEM_DATA_W/8)-1:0][7:0]    pk_mem_wdata_i;
+logic [(PK_MEM_DATA_W/8)-1:0]         pk_mem_wstrobe_i;
+
+
+
+  logic                     pk_mem_we_i;
+  logic [PK_MEM_ADDR_W-1:0] pk_mem_waddr_i;
+//  logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0][PK_MEM_WSTROBE_W-1:0] pk_mem_wdata_i;
+  //logic [(PK_MEM_NUM_DWORDS)-1:0][31:0] pk_mem_wdata_i;
+//  logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0] pk_mem_wstrobe_i;
+  //logic  [(PK_MEM_WSTROBE_W)-1:0] pk_mem_wstrobe_i;
+  logic                     pk_mem_re_i;
+  logic [PK_MEM_ADDR_W-1:0] pk_mem_raddr_i;
+  logic [PK_MEM_DATA_W-1:0] pk_mem_rdata_o;  
+  //logic [(PK_MEM_NUM_DWORDS)-1:0][31:0] pk_mem_rdata_o;
+
+
+
 
   logic [1:0][ABR_MEM_DATA_WIDTH-1:0] splitter_rand;
   logic [ABR_NUM_NTT-1:0][5:0] shuffling_rand;
@@ -441,10 +499,47 @@ abr_ctrl_inst
   .rst_b(rst_b),
   .zeroize(zeroize_reg),
 
+/*
   .sk_bank0_mem_if(sk_bank0_mem_if.req),
   .sk_bank1_mem_if(sk_bank1_mem_if.req),
   .sig_z_mem_if(sig_z_mem_if.req),
   .pk_mem_if(pk_mem_if.req),
+
+*/
+
+
+  .sk_bank0_mem_we_i(sk_bank0_mem_we_i),
+  .sk_bank0_mem_waddr_i(sk_bank0_mem_waddr_i),
+  .sk_bank0_mem_wdata_i(sk_bank0_mem_wdata_i),
+  .sk_bank0_mem_re_i(sk_bank0_mem_re_i),
+  .sk_bank0_mem_raddr_i(sk_bank0_mem_raddr_i),
+  .sk_bank0_mem_rdata_o(sk_bank0_mem_rdata_o),
+
+  .sk_bank1_mem_we_i(sk_bank1_mem_we_i),
+  .sk_bank1_mem_waddr_i(sk_bank1_mem_waddr_i),
+  .sk_bank1_mem_wdata_i(sk_bank1_mem_wdata_i),
+  .sk_bank1_mem_re_i(sk_bank1_mem_re_i),
+  .sk_bank1_mem_raddr_i(sk_bank1_mem_raddr_i),
+  .sk_bank1_mem_rdata_o(sk_bank1_mem_rdata_o),
+
+
+  .sig_z_mem_we_i(sig_z_mem_we_i),
+  .sig_z_mem_waddr_i(sig_z_mem_waddr_i),
+  .sig_z_mem_wdata_i(sig_z_mem_wdata_i),
+  .sig_z_mem_wstrobe_i(sig_z_mem_wstrobe_i),
+  .sig_z_mem_re_i(sig_z_mem_re_i),
+  .sig_z_mem_raddr_i(sig_z_mem_raddr_i),
+  .sig_z_mem_rdata_o(sig_z_mem_rdata_o),
+
+  .pk_mem_we_i(pk_mem_we_i),
+  .pk_mem_waddr_i(pk_mem_waddr_i),
+  .pk_mem_wdata_i(pk_mem_wdata_i),
+  .pk_mem_wstrobe_i(pk_mem_wstrobe_i),
+  .pk_mem_re_i(pk_mem_re_i),
+  .pk_mem_raddr_i(pk_mem_raddr_i),
+  .pk_mem_rdata_o(pk_mem_rdata_o),
+
+
 
 `ifdef RV_FPGA_SCA
   .NTT_trigger(NTT_trigger),
@@ -482,7 +577,7 @@ abr_ctrl_inst
   .sampler_state_data_i(sampler_state_data),
   .sampler_busy_i(sampler_busy),
 
-  //ntt interface — single command set from controller
+  //ntt interface â single command set from controller
   .ntt_enable_o(ntt_enable_ctrl),
   .ntt_mode_o(ntt_mode_ctrl),
   .ntt_mem_base_addr_o(ntt_mem_base_addr_ctrl),
@@ -588,7 +683,8 @@ abr_ctrl_inst
 
   .error_intr(error_intr),
   .notif_intr(notif_intr),
-  .debugUnlock_or_scan_mode_switch(debugUnlock_or_scan_mode_switch)
+  .debugUnlock_or_scan_mode_switch(debugUnlock_or_scan_mode_switch),
+  .trigger(trigger)
 );
 
 always_comb zeroize_mem_we = (zeroize_mem.rd_wr_en == RW_WRITE);
@@ -612,7 +708,7 @@ sampler_top_inst
 (
   .clk(clk),
   .rst_b(rst_b),
-  .zeroize(zeroize_reg),
+  .zeroize(zeroize_reg || skdecode_enable),
 
   .sampler_mode_i(sampler_mode),
   .sha3_start_i(sha3_start), //start the sha3 engine
@@ -658,7 +754,7 @@ always_comb begin
   ntt_shuffling_en[0]  = ntt_shuffling_en_ctrl;
 end
 
-// NTT[1] mirror — only present when MASKING_EN (else share[1] is out of bounds).
+// NTT[1] mirror â only present when MASKING_EN (else share[1] is out of bounds).
 generate if (MASKING_EN) begin : ntt1_ctrl_mirror
   always_comb begin
     ntt_enable[1]        = ntt_masking_en_ctrl ? ntt_enable_ctrl : '0;
@@ -690,6 +786,7 @@ generate
       accumulate[g_inst] = '0;
       sampler_valid[g_inst] = 0;
       sampler_ntt_mode[g_inst] = 0;
+      ntt_random_en[g_inst] = 0; //Turn off random in NTT for all ops except PWM, INTT
       mlkem_mode[g_inst] = 0;
 
       unique case (ntt_mode[g_inst]) inside
@@ -700,6 +797,7 @@ generate
         end
         MLDSA_INTT: begin
           mode[g_inst] = gs;
+          ntt_random_en[g_inst] = 1;
         end
         MLDSA_PWM_SMPL: begin
           mode[g_inst] = pwm;
@@ -715,11 +813,13 @@ generate
         MLDSA_PWM: begin
           mode[g_inst] = pwm;
           sampler_valid[g_inst] = 1;
+          ntt_random_en[g_inst] = 1;
         end
         MLDSA_PWM_ACCUM: begin
           mode[g_inst] = pwm;
           accumulate[g_inst] = 1;
           sampler_valid[g_inst] = 1;
+          ntt_random_en[g_inst] = 1;
         end
         MLDSA_PWA: begin
           mode[g_inst] = pwa;
@@ -735,6 +835,7 @@ generate
         end
         MLKEM_INTT: begin
           mode[g_inst] = gs;
+          ntt_random_en[g_inst] = 1;
           mlkem_mode[g_inst] = 1;
         end
         MLKEM_PWM_SMPL: begin
@@ -753,12 +854,14 @@ generate
         MLKEM_PWM: begin
           mode[g_inst] = pairwm;
           sampler_valid[g_inst] = 1;
+          ntt_random_en[g_inst] = 1;
           mlkem_mode[g_inst] = 1;
         end
         MLKEM_PWM_ACCUM: begin
           mode[g_inst] = pairwm;
           accumulate[g_inst] = 1;
           sampler_valid[g_inst] = 1;
+          ntt_random_en[g_inst] = 1;
           mlkem_mode[g_inst] = 1;
         end
         MLKEM_PWA: begin
@@ -795,7 +898,7 @@ generate
     .sampler_valid(sampler_valid[g_inst]),
     .shuffle_en(ntt_shuffling_en[g_inst]),
     .random(shuffling_rand[g_inst]),
-    //NTT mem IF — zero-extend 96→384 for inputs, truncate 384→96 for outputs
+    //NTT mem IF â zero-extend 96â384 for inputs, truncate 384â96 for outputs
     .mem_wr_req(ntt_mem_wr_req[g_inst]),
     .mem_rd_req(ntt_mem_rd_req[g_inst]),
     .mem_wr_data(ntt_mem_wr_data[g_inst]),
@@ -1152,6 +1255,23 @@ for (genvar gi = 0; gi < 2; gi++) begin : gen_lfsr
   );
 end
 
+  abr_1r1w_ram #(
+      .DEPTH(ABR_MEM_W1_DEPTH),
+      .DATA_WIDTH(ABR_MEM_W1_DATA_W)
+    ) 
+    abr_w1_mem_inst
+    (
+      .clk_i(clk),
+      .we_i((w1_mem_wr_req.rd_wr_en == RW_WRITE) | zeroize_mem_we_w1_inst),
+      .waddr_i((w1_mem_wr_req.addr[ABR_MEM_W1_ADDR_W-1:0]) | 
+                                       ({ABR_MEM_W1_ADDR_W{zeroize_mem_we_w1_inst}} & zeroize_mem_addr[ABR_MEM_W1_ADDR_W-1:0])), //FIXME params
+      .wdata_i(zeroize_mem_we_w1_inst ? '0 : w1_mem_wr_data),
+      .re_i(w1_mem_rd_req.rd_wr_en == RW_READ),
+      .raddr_i(w1_mem_rd_req.addr[ABR_MEM_W1_ADDR_W-1:0]),
+      .rdata_o(w1_mem_rd_data)
+    );
+
+/*
 always_comb begin
   abr_memory_export.w1_mem_we_i = (w1_mem_wr_req.rd_wr_en == RW_WRITE) | zeroize_mem_we_w1_inst;
   abr_memory_export.w1_mem_waddr_i = (w1_mem_wr_req.addr[ABR_MEM_W1_ADDR_W-1:0]) | 
@@ -1161,6 +1281,7 @@ always_comb begin
   abr_memory_export.w1_mem_raddr_i = w1_mem_rd_req.addr[ABR_MEM_W1_ADDR_W-1:0];
   w1_mem_rd_data = abr_memory_export.w1_mem_rdata_o;
 end
+*/
 
 // During MASKED_NTT_NOSHUF(c), NTT[1] mirrors NTT[0] and needs the same SIB source data.
 always_comb begin
@@ -1183,7 +1304,7 @@ always_ff @(posedge clk or negedge rst_b) begin
     ntt_sib_rd_detect_d1 <= ntt_sib_rd_detect;
 end
 
-//NTT Muxes — per-NTT direct assign (no cross-NTT OR)
+//NTT Muxes â per-NTT direct assign (no cross-NTT OR)
 always_comb begin
   ntt_mem_we_mux = '0;
   ntt_mem_re_mux = '0;
@@ -1216,7 +1337,7 @@ always_comb begin
   end
 end
 
-//Write Muxes — per-NTT: all non-NTT sources fan-out to every NTT index
+//Write Muxes â per-NTT: all non-NTT sources fan-out to every NTT index
 always_comb begin
   for (int unsigned i = 0; i < 3; i++) begin
     if (i == 0) begin
@@ -1275,7 +1396,7 @@ always_comb begin
   end
 end
 
-//Write Data Muxes — per-NTT
+//Write Data Muxes â per-NTT
 always_comb begin
   for (int unsigned ntt = 0; ntt < ABR_NUM_NTT; ntt++) begin
     for (int unsigned i = 1; i < 3; i++) begin
@@ -1288,7 +1409,7 @@ always_comb begin
   end
 end
 
-//Read Muxes — per-NTT
+//Read Muxes â per-NTT
 always_comb begin
   for (int unsigned i = 0; i < 3; i++) begin
     if (i == 0) begin
@@ -1316,7 +1437,7 @@ always_comb begin
         pwr2rnd_mem_re0_bank[0][bank]   = (pwr2rnd_mem_rd_req[bank].rd_wr_en == RW_READ);
 
         // NTT[0] reads from regular memory; non-NTT sources also use regular memory
-        // During RECOMBINE, NTT[0] pwm_b reads from masked memory — suppress from regular side
+        // During RECOMBINE, NTT[0] pwm_b reads from masked memory â suppress from regular side
         abr_mem_re0_bank[0][bank] = ntt_mem_re0_bank_mux[0][bank] | pwo_a_mem_re0_bank_mux[0][bank] | pwo_b_mem_re0_bank_mux[0][bank] |
                                    decomp_mem_re0_bank[0][0][bank] | decomp_mem_re0_bank[0][1][bank] | 
                                    skencode_mem_re0_bank[0][bank] | normcheck_mem_re0_bank[0][bank] |
@@ -1341,7 +1462,7 @@ always_comb begin
       compress_mem_re[0][i]  = (compress_mem_rd_req.rd_wr_en == RW_READ) & (compress_mem_rd_req.addr[ABR_MEM_ADDR_WIDTH-1:ABR_MEM_ADDR_WIDTH-3] == i);
 
       // NTT[0] reads from regular memory
-      // During RECOMBINE, NTT[0] pwm_b reads from masked memory — suppress from regular side
+      // During RECOMBINE, NTT[0] pwm_b reads from masked memory â suppress from regular side
       abr_mem_re[0][i] = ntt_mem_re_mux[0][i] | pwo_a_mem_re_mux[0][i] | pwo_b_mem_re_mux[0][i] |
                         decomp_mem_re[0][0][i] | decomp_mem_re[0][1][i] | 
                         normcheck_mem_re[0][i] | makehint_mem_re[0][i] | compress_mem_re[0][i];
@@ -1357,13 +1478,13 @@ always_comb begin
   end
 end
 
-// NTT[1] masked memory read mux — present only when MASKING_EN.
+// NTT[1] masked memory read mux â present only when MASKING_EN.
 generate if (MASKING_EN) begin : ntt1_mem_read_mux
   always_comb begin
     for (int unsigned bank = 0; bank < 2; bank++) begin
       // Masked-mem parallel read for share1 fetch on any active fused consumer.
-      // For PWS_R, operand1→pwm_b at abr_ctrl (operand-swap convention), so PWS_R
-      // also uses pwm_b's request — NOT pwm_a's (which carries an unrelated operand2).
+      // For PWS_R, operand1âpwm_b at abr_ctrl (operand-swap convention), so PWS_R
+      // also uses pwm_b's request â NOT pwm_a's (which carries an unrelated operand2).
       // recombine_en from abr_ctrl; *_mem_re* steers active consumer (mutex).
       abr_mem_re0_bank[1][bank] = ntt_mem_re0_bank_mux[1][bank] | pwo_a_mem_re0_bank_mux[1][bank] | pwo_b_mem_re0_bank_mux[1][bank] |
                                   (recombine_en & (pwo_b_mem_re0_bank[0][0][bank] |
@@ -1481,7 +1602,7 @@ generate
   end
 endgenerate
 
-//Read data muxes — NTT[0] from regular memory, NTT[1] from masked memory
+//Read data muxes â NTT[0] from regular memory, NTT[1] from masked memory
 always_comb begin
   ntt_mem_rd_data = 0;
   pwm_a_rd_data = 0;
@@ -1550,9 +1671,9 @@ generate
 endgenerate
 
 // Per-bank share capture. For PWS_R, operand1 (to-be-recombined) is on pwm_b
-// (abr_ctrl operand1→pw_base_addr_b swap). Single-port consumers fire on one
-// bank/cycle; the inactive bank sees share0=share1=0 → recombine=0, harmless.
-// SIGENCODE_R/SKENCODE_R/PWR2RND_R fire both banks concurrently (port↔bank fixed).
+// (abr_ctrl operand1âpw_base_addr_b swap). Single-port consumers fire on one
+// bank/cycle; the inactive bank sees share0=share1=0 â recombine=0, harmless.
+// SIGENCODE_R/SKENCODE_R/PWR2RND_R fire both banks concurrently (portâbank fixed).
 always_comb begin
   for (int unsigned bank = 0; bank < 2; bank++) begin
     recombine_share0[bank] = '0;
@@ -1577,7 +1698,7 @@ always_comb begin
   end
   // Non-banked memories (i==1,2): only PWS_R, NORMCHK_R, COMPRESS_R, DECOMPOSE_R
   // contribute (SIGENCODE/SKENCODE/PWR2RND are banked-only). Broadcast to both
-  // bank recombiners — the single-port consumer mux below OR-merges harmlessly.
+  // bank recombiners â the single-port consumer mux below OR-merges harmlessly.
   for (int unsigned i = 1; i < 3; i++) begin
     automatic logic other_src_sel;
     other_src_sel = recombine_en_pipe[SRAM_LATENCY] &
@@ -1594,9 +1715,9 @@ always_comb begin
 end
 
 generate if (MASKING_EN) begin : g_recombiner
-  // Per-bank dual recombiner — required by dual-port consumers
+  // Per-bank dual recombiner â required by dual-port consumers
   // (SIGENCODE_R/SKENCODE_R/PWR2RND_R). Single-port consumers see
-  // share0=share1=0 on the inactive bank → output 0, OR-merges harmlessly.
+  // share0=share1=0 on the inactive bank â output 0, OR-merges harmlessly.
   for (genvar bank = 0; bank < 2; bank++) begin : g_per_bank
     abr_recombiner u_recombiner (
       .mode     (recombine_mode),
@@ -1609,7 +1730,7 @@ end else begin : g_no_recombiner
   assign recombine_data  = '0;
 end endgenerate
 
-// SKENCODE_R / SIGENCODE_R / PWR2RND_R consumer muxes — dual-port: each port
+// SKENCODE_R / SIGENCODE_R / PWR2RND_R consumer muxes â dual-port: each port
 // maps to its own bank's recombiner output. Dormant case falls through to the
 // regular-mem path (bit-identical to baseline).
 always_comb begin
@@ -1641,7 +1762,7 @@ always_comb decomp_mem_rd_data_valid = (|decomp_mem_re[SRAM_LATENCY]) || (|decom
 always_comb begin: ntt_rd_data_valid_gen
   for (int unsigned ntt = 0; ntt < ABR_NUM_NTT; ntt++) begin
     // SIB valid: Both NTTs use NTT[0]'s SIB read detect (pipelined 1 cycle).
-    // Only NTT[0] actually drives the SIB read port — NTT[1]'s SIB-range addresses
+    // Only NTT[0] actually drives the SIB read port â NTT[1]'s SIB-range addresses
     // go nowhere in the memory mux (no inst4 decode). Since NOSHUF guarantees both
     // NTTs are cycle-aligned (same addresses, same timing), NTT[0]'s SIB read detect
     // fires at exactly the cycles NTT[1] also needs valid. SIB data is already
@@ -1657,68 +1778,227 @@ always_comb skencode_mem_rd_data_valid = (|skencode_mem_re0_bank[SRAM_LATENCY]);
 always_comb sigencode_mem_rd_data_valid = (|sigencode_mem_re0_bank[SRAM_LATENCY]);
 always_comb pwr2rnd_mem_rd_data_valid = (|pwr2rnd_mem_re0_bank[SRAM_LATENCY]);  
 
-///Memory instance 0 bank 0 — regular (NTT[0])
+///Memory instance 0 bank 0 â regular (NTT[0])
+abr_1r1w_ram #(
+  .DEPTH(ABR_MEM_INST0_DEPTH),
+  .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+) mem_inst0_bank0
+(
+  .clk_i(clk),
+  .we_i((abr_mem_we0_bank[0][0])),
+  .waddr_i((abr_mem_waddr0_bank[0][0][ABR_MEM_INST0_ADDR_W-1:0])),
+  .wdata_i((abr_mem_wdata0_bank[0][0])),
+  .re_i(zeroize_mem_re ? 1'b1 : (abr_mem_re0_bank[0][0])),
+  .raddr_i(zeroize_mem_re ? '0 : (abr_mem_raddr0_bank[0][0][ABR_MEM_INST0_ADDR_W-1:0])),
+  .rdata_o(abr_mem_rdata0_bank[0][0])
+);
+
+/*
 always_comb abr_memory_export.mem_inst0_bank0_we_i = (abr_mem_we0_bank[0][0]);
 always_comb abr_memory_export.mem_inst0_bank0_waddr_i = (abr_mem_waddr0_bank[0][0][ABR_MEM_INST0_ADDR_W-1:0]);
 always_comb abr_memory_export.mem_inst0_bank0_wdata_i = (abr_mem_wdata0_bank[0][0]);
 always_comb abr_memory_export.mem_inst0_bank0_re_i = zeroize_mem_re ? 1'b1: (abr_mem_re0_bank[0][0]);
 always_comb abr_memory_export.mem_inst0_bank0_raddr_i = zeroize_mem_re ? '0: (abr_mem_raddr0_bank[0][0][ABR_MEM_INST0_ADDR_W-1:0]);
 always_comb abr_mem_rdata0_bank[0][0] = abr_memory_export.mem_inst0_bank0_rdata_o;
+*/
 
-//Memory instance 0 bank 1 — regular (NTT[0])
+
+//Memory instance 0 bank 1 â regular (NTT[0])
+abr_1r1w_ram #(
+  .DEPTH(ABR_MEM_INST0_DEPTH),
+  .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+) mem_inst0_bank1
+(
+  .clk_i(clk),
+  .we_i((abr_mem_we0_bank[0][1])),
+  .waddr_i((abr_mem_waddr0_bank[0][1][ABR_MEM_INST0_ADDR_W-1:0])),
+  .wdata_i((abr_mem_wdata0_bank[0][1])),
+  .re_i(zeroize_mem_re ? 1'b1 : (abr_mem_re0_bank[0][1])),
+  .raddr_i(zeroize_mem_re ? '0 : (abr_mem_raddr0_bank[0][1][ABR_MEM_INST0_ADDR_W-1:0])),
+  .rdata_o(abr_mem_rdata0_bank[0][1])
+);
+
+/*
 always_comb abr_memory_export.mem_inst0_bank1_we_i = (abr_mem_we0_bank[0][1]);
 always_comb abr_memory_export.mem_inst0_bank1_waddr_i = (abr_mem_waddr0_bank[0][1][ABR_MEM_INST0_ADDR_W-1:0]);
 always_comb abr_memory_export.mem_inst0_bank1_wdata_i = (abr_mem_wdata0_bank[0][1]);
 always_comb abr_memory_export.mem_inst0_bank1_re_i = zeroize_mem_re ? 1'b1: (abr_mem_re0_bank[0][1]);
 always_comb abr_memory_export.mem_inst0_bank1_raddr_i = zeroize_mem_re ? '0: (abr_mem_raddr0_bank[0][1][ABR_MEM_INST0_ADDR_W-1:0]);
 always_comb abr_mem_rdata0_bank[0][1] = abr_memory_export.mem_inst0_bank1_rdata_o;
+*/
+//Memory instance 1 â regular (NTT[0])
+abr_1r1w_ram #(
+  .DEPTH(ABR_MEM_INST1_DEPTH),
+  .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+) mem_inst1
+(
+  .clk_i(clk),
+  .we_i((abr_mem_we[0][1])),
+  .waddr_i((abr_mem_waddr[0][1][ABR_MEM_INST1_ADDR_W-1:0])),
+  .wdata_i((abr_mem_wdata[0][1])),
+  .re_i(zeroize_mem_re ? 1'b1 : (abr_mem_re[0][1])),
+  .raddr_i(zeroize_mem_re ? '0 : (abr_mem_raddr[0][1][ABR_MEM_INST1_ADDR_W-1:0])),
+  .rdata_o(abr_mem_rdata[0][1])
+);
 
-//Memory instance 1 — regular (NTT[0])
+/*
 always_comb abr_memory_export.mem_inst1_we_i = (abr_mem_we[0][1]);
 always_comb abr_memory_export.mem_inst1_waddr_i = (abr_mem_waddr[0][1][ABR_MEM_INST1_ADDR_W-1:0]);
 always_comb abr_memory_export.mem_inst1_wdata_i = (abr_mem_wdata[0][1]);
 always_comb abr_memory_export.mem_inst1_re_i = zeroize_mem_re ? 1'b1: (abr_mem_re[0][1]);
 always_comb abr_memory_export.mem_inst1_raddr_i = zeroize_mem_re ? '0: (abr_mem_raddr[0][1][ABR_MEM_INST1_ADDR_W-1:0]);
 always_comb abr_mem_rdata[0][1] = abr_memory_export.mem_inst1_rdata_o;
+*/
 
-//Memory instance 2 — regular (NTT[0])
+//Memory instance 2 â regular (NTT[0])
+
+abr_1r1w_ram #(
+  .DEPTH(ABR_MEM_INST2_DEPTH),
+  .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+) mem_inst2
+(
+  .clk_i(clk),
+  .we_i((abr_mem_we[0][2])),
+  .waddr_i((abr_mem_waddr[0][2][ABR_MEM_INST2_ADDR_W-1:0])),
+  .wdata_i((abr_mem_wdata[0][2])),
+  .re_i(zeroize_mem_re ? 1'b1 : (abr_mem_re[0][2])),
+  .raddr_i(zeroize_mem_re ? '0 : (abr_mem_raddr[0][2][ABR_MEM_INST2_ADDR_W-1:0])),
+  .rdata_o(abr_mem_rdata[0][2])
+);
+/*
 always_comb abr_memory_export.mem_inst2_we_i = (abr_mem_we[0][2]);
 always_comb abr_memory_export.mem_inst2_waddr_i = (abr_mem_waddr[0][2][ABR_MEM_INST2_ADDR_W-1:0]);
 always_comb abr_memory_export.mem_inst2_wdata_i = (abr_mem_wdata[0][2]);
 always_comb abr_memory_export.mem_inst2_re_i = zeroize_mem_re ? 1'b1: (abr_mem_re[0][2]);
 always_comb abr_memory_export.mem_inst2_raddr_i = zeroize_mem_re ? '0: (abr_mem_raddr[0][2][ABR_MEM_INST2_ADDR_W-1:0]);
 always_comb abr_mem_rdata[0][2] = abr_memory_export.mem_inst2_rdata_o;
+*/
 
-// Masked memory exports — NTT[1] (only when MASKING_EN=1)
+
+// Masked memory exports â NTT[1] (only when MASKING_EN=1)
 generate if (MASKING_EN) begin : masked_mem_export_gen
+/*  
   always_comb abr_memory_export.mem_inst0_bank0_masked_we_i = abr_mem_we0_bank[1][0];
   always_comb abr_memory_export.mem_inst0_bank0_masked_waddr_i = abr_mem_waddr0_bank[1][0][ABR_MEM_INST0_ADDR_W-1:0];
   always_comb abr_memory_export.mem_inst0_bank0_masked_wdata_i = abr_mem_wdata0_bank[1][0];
   always_comb abr_memory_export.mem_inst0_bank0_masked_re_i = zeroize_mem_re ? 1'b1 : abr_mem_re0_bank[1][0];
   always_comb abr_memory_export.mem_inst0_bank0_masked_raddr_i = zeroize_mem_re ? '0 : abr_mem_raddr0_bank[1][0][ABR_MEM_INST0_ADDR_W-1:0];
   always_comb abr_mem_rdata0_bank[1][0] = abr_memory_export.mem_inst0_bank0_masked_rdata_o;
+*/
 
+ abr_1r1w_ram #(
+      .DEPTH(ABR_MEM_INST0_DEPTH),
+      .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+    ) mem_inst0_bank0_masked
+    (
+      .clk_i(clk),
+      .we_i(abr_mem_we0_bank[1][0]),
+      .waddr_i(abr_mem_waddr0_bank[1][0][ABR_MEM_INST0_ADDR_W-1:0]),
+      .wdata_i(abr_mem_wdata0_bank[1][0]),
+      .re_i(zeroize_mem_re ? 1'b1 : abr_mem_re0_bank[1][0]),
+      .raddr_i(zeroize_mem_re ? '0 : abr_mem_raddr0_bank[1][0][ABR_MEM_INST0_ADDR_W-1:0]),
+      .rdata_o(abr_mem_rdata0_bank[1][0])
+    );
+
+
+/*
   always_comb abr_memory_export.mem_inst0_bank1_masked_we_i = abr_mem_we0_bank[1][1];
   always_comb abr_memory_export.mem_inst0_bank1_masked_waddr_i = abr_mem_waddr0_bank[1][1][ABR_MEM_INST0_ADDR_W-1:0];
   always_comb abr_memory_export.mem_inst0_bank1_masked_wdata_i = abr_mem_wdata0_bank[1][1];
   always_comb abr_memory_export.mem_inst0_bank1_masked_re_i = zeroize_mem_re ? 1'b1 : abr_mem_re0_bank[1][1];
   always_comb abr_memory_export.mem_inst0_bank1_masked_raddr_i = zeroize_mem_re ? '0 : abr_mem_raddr0_bank[1][1][ABR_MEM_INST0_ADDR_W-1:0];
   always_comb abr_mem_rdata0_bank[1][1] = abr_memory_export.mem_inst0_bank1_masked_rdata_o;
+*/
+  
+  abr_1r1w_ram #(
+      .DEPTH(ABR_MEM_INST0_DEPTH),
+      .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+    ) mem_inst0_bank1_masked
+    (
+      .clk_i(clk),
+      .we_i(abr_mem_we0_bank[1][1]),
+      .waddr_i(abr_mem_waddr0_bank[1][1][ABR_MEM_INST0_ADDR_W-1:0]),
+      .wdata_i(abr_mem_wdata0_bank[1][1]),
+      .re_i(zeroize_mem_re ? 1'b1 : abr_mem_re0_bank[1][1]),
+      .raddr_i( zeroize_mem_re ? '0 : abr_mem_raddr0_bank[1][1][ABR_MEM_INST0_ADDR_W-1:0]),
+      .rdata_o(abr_mem_rdata0_bank[1][1])
+  );
 
+/*
   always_comb abr_memory_export.mem_inst1_masked_we_i = abr_mem_we[1][1];
   always_comb abr_memory_export.mem_inst1_masked_waddr_i = abr_mem_waddr[1][1][ABR_MEM_INST1_ADDR_W-1:0];
   always_comb abr_memory_export.mem_inst1_masked_wdata_i = abr_mem_wdata[1][1];
   always_comb abr_memory_export.mem_inst1_masked_re_i = zeroize_mem_re ? 1'b1 : abr_mem_re[1][1];
   always_comb abr_memory_export.mem_inst1_masked_raddr_i = zeroize_mem_re ? '0 : abr_mem_raddr[1][1][ABR_MEM_INST1_ADDR_W-1:0];
   always_comb abr_mem_rdata[1][1] = abr_memory_export.mem_inst1_masked_rdata_o;
+*/
+  abr_1r1w_ram #(
+      .DEPTH(ABR_MEM_INST1_DEPTH),
+      .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+    ) mem_inst1_masked
+    (
+      .clk_i(clk),
+      .we_i(abr_mem_we[1][1]),
+      .waddr_i(abr_mem_waddr[1][1][ABR_MEM_INST1_ADDR_W-1:0]),
+      .wdata_i(abr_mem_wdata[1][1]),
+      .re_i(zeroize_mem_re ? 1'b1 : abr_mem_re[1][1]),
+      .raddr_i(zeroize_mem_re ? '0 :  abr_mem_raddr[1][1][ABR_MEM_INST1_ADDR_W-1:0]),
+      .rdata_o(abr_mem_rdata[1][1])
+  ); 
 
+
+/*
   always_comb abr_memory_export.mem_inst2_masked_we_i = abr_mem_we[1][2];
   always_comb abr_memory_export.mem_inst2_masked_waddr_i = abr_mem_waddr[1][2][ABR_MEM_INST2_ADDR_W-1:0];
   always_comb abr_memory_export.mem_inst2_masked_wdata_i = abr_mem_wdata[1][2];
   always_comb abr_memory_export.mem_inst2_masked_re_i = zeroize_mem_re ? 1'b1 : abr_mem_re[1][2];
   always_comb abr_memory_export.mem_inst2_masked_raddr_i = zeroize_mem_re ? '0 : abr_mem_raddr[1][2][ABR_MEM_INST2_ADDR_W-1:0];
   always_comb abr_mem_rdata[1][2] = abr_memory_export.mem_inst2_masked_rdata_o;
+*/
+  abr_1r1w_ram #(
+      .DEPTH(ABR_MEM_INST2_DEPTH),
+      .DATA_WIDTH(ABR_MEM_DATA_WIDTH)
+    ) mem_inst2_masked
+    (
+      .clk_i(clk),
+      .we_i(abr_mem_we[1][2]),
+      .waddr_i(abr_mem_waddr[1][2][ABR_MEM_INST2_ADDR_W-1:0]),
+      .wdata_i(abr_mem_wdata[1][2]),
+      .re_i(zeroize_mem_re ? 1'b1 : abr_mem_re[1][2]),
+      .raddr_i(zeroize_mem_re ? '0 : abr_mem_raddr[1][2][ABR_MEM_INST2_ADDR_W-1:0]),
+      .rdata_o(abr_mem_rdata[1][2])
+  );
+
 end else begin : no_masked_mem_export_gen
+ always_comb begin
+        abr_mem_we0_bank[1][0] = '0;
+        abr_mem_waddr0_bank[1][0][ABR_MEM_INST0_ADDR_W-1:0] = '0;
+        abr_mem_wdata0_bank[1][0] = '0;
+        abr_mem_re0_bank[1][0] = '0;
+        abr_mem_raddr0_bank[1][0][ABR_MEM_INST0_ADDR_W-1:0] = '0;
+        
+        abr_mem_we0_bank[1][1] = '0;
+        abr_mem_waddr0_bank[1][1][ABR_MEM_INST0_ADDR_W-1:0] = '0;
+        abr_mem_wdata0_bank[1][1] = '0;
+        abr_mem_re0_bank[1][1] = '0;
+        abr_mem_raddr0_bank[1][1][ABR_MEM_INST0_ADDR_W-1:0] = '0;
+        
+      
+        abr_mem_we[1][1] = '0;
+        abr_mem_waddr[1][1][ABR_MEM_INST1_ADDR_W-1:0] = '0;
+        abr_mem_wdata[1][1] = '0;
+        abr_mem_re[1][1] = '0;
+        abr_mem_raddr[1][1][ABR_MEM_INST1_ADDR_W-1:0] = '0;
+        
+        abr_mem_we[1][2] = '0;
+        abr_mem_waddr[1][2][ABR_MEM_INST2_ADDR_W-1:0] = '0;
+        abr_mem_wdata[1][2] = '0;
+        abr_mem_re[1][2] = '0;
+        abr_mem_raddr[1][2][ABR_MEM_INST2_ADDR_W-1:0] = '0;
+        
+   end
+
+/*
   // Tie off masked memory write ports when MASKING_EN=0
   always_comb abr_memory_export.mem_inst0_bank0_masked_we_i = '0;
   always_comb abr_memory_export.mem_inst0_bank0_masked_waddr_i = '0;
@@ -1740,25 +2020,81 @@ end else begin : no_masked_mem_export_gen
   always_comb abr_memory_export.mem_inst2_masked_wdata_i = '0;
   always_comb abr_memory_export.mem_inst2_masked_re_i = '0;
   always_comb abr_memory_export.mem_inst2_masked_raddr_i = '0;
+*/
 end endgenerate
 
 //SK Memory Bank 0
+abr_1r1w_ram #(
+  .DEPTH(SK_MEM_BANK_DEPTH),
+  .DATA_WIDTH(SK_MEM_BANK_DATA_W)
+)
+//`ABR_MEM(SK_MEM_BANK_DEPTH,SK_MEM_BANK_DATA_W,sk_mem_bank0,SRAM_LATENCY)
+ sk_mem_bank0
+(
+  .clk_i(clk),
+  .we_i(sk_bank0_mem_we_i),
+  .waddr_i(sk_bank0_mem_waddr_i),
+  .wdata_i(sk_bank0_mem_wdata_i),
+  .re_i( zeroize_mem_re ? 1'b1 : sk_bank0_mem_re_i),
+  .raddr_i( zeroize_mem_re ? '0 : sk_bank0_mem_raddr_i),
+  .rdata_o(sk_bank0_mem_rdata_o)
+);
+/*
 always_comb abr_memory_export.sk_mem_bank0_we_i = sk_bank0_mem_if.we_i;
 always_comb abr_memory_export.sk_mem_bank0_waddr_i = sk_bank0_mem_if.waddr_i;
 always_comb abr_memory_export.sk_mem_bank0_wdata_i = sk_bank0_mem_if.wdata_i;
 always_comb abr_memory_export.sk_mem_bank0_re_i = zeroize_mem_re ? 1'b1: sk_bank0_mem_if.re_i;
 always_comb abr_memory_export.sk_mem_bank0_raddr_i = zeroize_mem_re ? '0: sk_bank0_mem_if.raddr_i;
 always_comb sk_bank0_mem_if.rdata_o = abr_memory_export.sk_mem_bank0_rdata_o;
+*/
 
 //SK Memory Bank 1
+abr_1r1w_ram #(
+  .DEPTH(SK_MEM_BANK_DEPTH),
+  .DATA_WIDTH(SK_MEM_BANK_DATA_W)
+) 
+//`ABR_MEM(SK_MEM_BANK_DEPTH,SK_MEM_BANK_DATA_W,sk_mem_bank1,SRAM_LATENCY)
+sk_mem_bank1
+(
+  .clk_i(clk),
+  .we_i(sk_bank1_mem_we_i),
+  .waddr_i(sk_bank1_mem_waddr_i),
+  .wdata_i(sk_bank1_mem_wdata_i),
+  .re_i( zeroize_mem_re ? 1'b1 : sk_bank1_mem_re_i),
+  .raddr_i( zeroize_mem_re ? '0 : sk_bank1_mem_raddr_i),
+  .rdata_o(sk_bank1_mem_rdata_o)
+);
+
+/*
 always_comb abr_memory_export.sk_mem_bank1_we_i = sk_bank1_mem_if.we_i;
 always_comb abr_memory_export.sk_mem_bank1_waddr_i = sk_bank1_mem_if.waddr_i;
 always_comb abr_memory_export.sk_mem_bank1_wdata_i = sk_bank1_mem_if.wdata_i;
 always_comb abr_memory_export.sk_mem_bank1_re_i = zeroize_mem_re ? 1'b1: sk_bank1_mem_if.re_i;
 always_comb abr_memory_export.sk_mem_bank1_raddr_i = zeroize_mem_re ? '0: sk_bank1_mem_if.raddr_i;
 always_comb sk_bank1_mem_if.rdata_o = abr_memory_export.sk_mem_bank1_rdata_o;
+*/
+
 
 //Sig Z Memory
+abr_1r1w_be_ram #(
+  .DEPTH(SIG_Z_MEM_DEPTH),
+  .DATA_WIDTH(SIG_Z_MEM_DATA_W),
+  .STROBE_WIDTH(8) //change 8
+//`ABR_MEM_BE(SIG_Z_MEM_DEPTH,SIG_Z_MEM_DATA_W,sig_z_mem,SRAM_LATENCY)
+) 
+sig_z_mem
+(
+  .clk_i(clk),
+  .we_i(sig_z_mem_we_i),
+  .waddr_i(sig_z_mem_waddr_i),
+  .wdata_i(sig_z_mem_wdata_i),
+  .wstrobe_i(sig_z_mem_wstrobe_i),
+  .re_i( zeroize_mem_re ? 1'b1 : sig_z_mem_re_i),
+  .raddr_i( zeroize_mem_re ? '0 : sig_z_mem_raddr_i),
+  .rdata_o(sig_z_mem_rdata_o)
+);
+
+/*
 always_comb abr_memory_export.sig_z_mem_we_i = sig_z_mem_if.we_i;
 always_comb abr_memory_export.sig_z_mem_waddr_i = sig_z_mem_if.waddr_i;
 always_comb abr_memory_export.sig_z_mem_wdata_i = sig_z_mem_if.wdata_i;
@@ -1766,8 +2102,30 @@ always_comb abr_memory_export.sig_z_mem_wstrobe_i = sig_z_mem_if.wstrobe_i;
 always_comb abr_memory_export.sig_z_mem_re_i = zeroize_mem_re ? 1'b1: sig_z_mem_if.re_i;
 always_comb abr_memory_export.sig_z_mem_raddr_i = zeroize_mem_re ? '0: sig_z_mem_if.raddr_i;
 always_comb sig_z_mem_if.rdata_o = abr_memory_export.sig_z_mem_rdata_o;
+*/
+
 
 //PK Memory
+
+abr_1r1w_be_ram #(
+  .DEPTH(PK_MEM_DEPTH),
+  .DATA_WIDTH(PK_MEM_DATA_W),
+  .STROBE_WIDTH(8)//change it 8
+) 
+pk_mem
+//`ABR_MEM_BE(PK_MEM_DEPTH,PK_MEM_DATA_W,pk_mem,SRAM_LATENCY)
+//pk_memh\
+(
+  .clk_i(clk),
+  .we_i(pk_mem_we_i),
+  .waddr_i(pk_mem_waddr_i),
+  .wdata_i(pk_mem_wdata_i),
+  .wstrobe_i(pk_mem_wstrobe_i),
+  .re_i(zeroize_mem_re ? 1'b1:pk_mem_re_i),
+  .raddr_i(zeroize_mem_re ? '0: pk_mem_raddr_i),
+  .rdata_o(pk_mem_rdata_o)
+);
+/*
 always_comb abr_memory_export.pk_mem_we_i = pk_mem_if.we_i;
 always_comb abr_memory_export.pk_mem_waddr_i = pk_mem_if.waddr_i;
 always_comb abr_memory_export.pk_mem_wdata_i = pk_mem_if.wdata_i;
@@ -1775,7 +2133,7 @@ always_comb abr_memory_export.pk_mem_wstrobe_i = pk_mem_if.wstrobe_i;
 always_comb abr_memory_export.pk_mem_re_i = zeroize_mem_re ? 1'b1: pk_mem_if.re_i;
 always_comb abr_memory_export.pk_mem_raddr_i = zeroize_mem_re ? '0: pk_mem_if.raddr_i;
 always_comb pk_mem_if.rdata_o = abr_memory_export.pk_mem_rdata_o;
-
+*/
 `ABR_ASSERT_MUTEX(ERR_MEM_0_0_RD_ACCESS_MUTEX, {ntt_mem_re0_bank_mux[0][0],pwo_a_mem_re0_bank_mux[0][0],pwo_b_mem_re0_bank_mux[0][0],
                                                 decomp_mem_re0_bank[0][0][0],decomp_mem_re0_bank[0][1][0], pwr2rnd_mem_re0_bank[0][0],
                                                 skencode_mem_re0_bank[0][0], normcheck_mem_re0_bank[0][0], sigencode_mem_re0_bank[0][0],

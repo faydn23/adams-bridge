@@ -73,7 +73,7 @@ module abr_ctrl
 
   output logic [ABR_MEM_ADDR_WIDTH-1:0] dest_base_addr_o,
 
-  //ntt interfaces — single command set, abr_top handles mirroring to NTT[1]
+  //ntt interfaces â single command set, abr_top handles mirroring to NTT[1]
   output logic                        ntt_enable_o,
   output abr_ntt_mode_e               ntt_mode_o,
   output ntt_mem_addr_t               ntt_mem_base_addr_o,
@@ -175,10 +175,51 @@ module abr_ctrl
   output logic [1:0][LFSR_W-1:0] lfsr_seed_o,
 
   //Memory interface export
-  abr_sram_if.req sk_bank0_mem_if,
-  abr_sram_if.req sk_bank1_mem_if,
-  abr_sram_be_if.req sig_z_mem_if,
-  abr_sram_be_if.req pk_mem_if,
+  //abr_sram_if.req sk_bank0_mem_if,
+  //abr_sram_if.req sk_bank1_mem_if,
+  //abr_sram_be_if.req sig_z_mem_if,
+  //abr_sram_be_if.req pk_mem_if,
+
+  output logic                     sk_bank0_mem_we_i,
+  output logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank0_mem_waddr_i,
+  output logic [SK_MEM_BANK_DATA_W-1:0]sk_bank0_mem_wdata_i,
+  output logic                     sk_bank0_mem_re_i,
+  output logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank0_mem_raddr_i,
+  input logic [SK_MEM_BANK_DATA_W-1:0] sk_bank0_mem_rdata_o,
+
+  output logic                     sk_bank1_mem_we_i,
+  output logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank1_mem_waddr_i,
+  output logic [SK_MEM_BANK_DATA_W-1:0]sk_bank1_mem_wdata_i,
+  output logic                     sk_bank1_mem_re_i,
+  output logic [SK_MEM_BANK_ADDR_W-1:0] sk_bank1_mem_raddr_i,
+  input logic [SK_MEM_BANK_DATA_W-1:0] sk_bank1_mem_rdata_o,
+
+  output logic                        sig_z_mem_we_i,
+  output logic [SIG_Z_MEM_ADDR_W-1:0] sig_z_mem_waddr_i,
+  //output logic [(SIG_Z_MEM_DATA_W/SIG_Z_MEM_WSTROBE_W)-1:0][SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wdata_i,
+  //output logic [(SIG_Z_MEM_DATA_W/SIG_Z_MEM_WSTROBE_W)-1:0] sig_z_mem_wstrobe_i,
+  output logic                     sig_z_mem_re_i,
+  output logic [SIG_Z_MEM_ADDR_W-1:0] sig_z_mem_raddr_i,
+  input logic [SIG_Z_MEM_DATA_W-1:0] sig_z_mem_rdata_o,
+  //output logic [SIG_Z_MEM_NUM_DWORD-1:0][31:0] sig_z_mem_wdata_i, 
+  //output logic [SIG_Z_MEM_WSTROBE_W-1:0] sig_z_mem_wstrobe_i,
+  //input logic [SIG_Z_MEM_NUM_DWORD-1:0][31:0] sig_z_mem_rdata_o,
+
+  output logic [(SIG_Z_MEM_DATA_W/8)-1:0][7:0] sig_z_mem_wdata_i,
+  output logic [(SIG_Z_MEM_DATA_W/8)-1:0]      sig_z_mem_wstrobe_i,
+
+  output logic                     pk_mem_we_i,
+  output logic [PK_MEM_ADDR_W-1:0] pk_mem_waddr_i,
+  //output logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0][PK_MEM_WSTROBE_W-1:0] pk_mem_wdata_i, 
+  //output logic [(PK_MEM_NUM_DWORDS)-1:0][31:0] pk_mem_wdata_i,
+  //output logic [(PK_MEM_DATA_W/PK_MEM_WSTROBE_W)-1:0] pk_mem_wstrobe_i,
+  output logic                     pk_mem_re_i,
+  output logic [PK_MEM_ADDR_W-1:0] pk_mem_raddr_i,
+  input logic  [PK_MEM_DATA_W-1:0] pk_mem_rdata_o,
+  //input logic  [(PK_MEM_NUM_DWORDS)-1:0][31:0]  pk_mem_rdata_o,
+ 
+  output logic [(PK_MEM_DATA_W/8)-1:0][7:0] pk_mem_wdata_i,
+  output logic [(PK_MEM_DATA_W/8)-1:0]      pk_mem_wstrobe_i,
 
   output mem_if_t zeroize_mem_o,
 
@@ -198,7 +239,8 @@ module abr_ctrl
 
   //Interrupts
   output logic error_intr,
-  output logic notif_intr
+  output logic notif_intr,
+  output logic trigger
 
   );
 
@@ -587,6 +629,57 @@ always_comb kv_mlkem_msg_write_data = '0;
   logic [ABR_MEM_ADDR_WIDTH-1:0] zeroize_mem_addr;
   logic zeroize_mem_done;
   
+  
+  logic busy_o_d;
+  logic sampler_busy_d;
+
+  logic [63:0] meas_cycle;
+  
+
+  //furkan-dbg-begin
+  always_ff @(posedge clk or negedge rst_b) begin
+     if (!rst_b) begin
+	   trigger <= 0;	
+     end else if (zeroize) begin
+	   trigger <= 0;	
+     end else begin
+	   if(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
+		  trigger <= 1;
+	   if(mldsa_signature_done)
+		  trigger <= 0;
+     end
+  end
+  
+  
+
+  always_ff @(posedge clk or negedge rst_b) begin
+     if (!rst_b) begin
+        busy_o_d       <= 1'b0;
+        sampler_busy_d <= 1'b0;
+        meas_cycle     <= 64'd0;
+     end
+     else if (zeroize) begin
+        busy_o_d       <= 1'b0;
+        sampler_busy_d <= 1'b0;
+        meas_cycle     <= 64'd0;
+     end
+     else begin
+        busy_o_d       <= busy_o;
+        sampler_busy_d <= sampler_busy_i;
+
+      if (!busy_o_d && busy_o) begin
+        // measurement start cycle = 0
+        meas_cycle <= 64'd0;
+      end
+      else if (busy_o) begin
+        meas_cycle <= meas_cycle + 64'd1;
+      end
+      else begin
+        meas_cycle <= 64'd0;
+      end
+    end
+  end
+
 
   //Private Key and Decaps Key External Memory
   //Request muxing
@@ -1068,7 +1161,7 @@ always_comb kv_mlkem_msg_write_data = '0;
   always_comb privkey_out_rdata = {ABR_REG_WIDTH{api_keymem_re_bank[SRAM_LATENCY][0]}} & sk_ram_rdata[0] |
                                   {ABR_REG_WIDTH{api_keymem_re_bank[SRAM_LATENCY][1]}} & sk_ram_rdata[1] |
                                   {ABR_REG_WIDTH{api_sk_reg_re[SRAM_LATENCY]}} & api_reg_rdata;
-
+/*
   always_comb sk_bank0_mem_if.we_i = (sk_ram_we_bank[0]);
   always_comb sk_bank0_mem_if.waddr_i = (sk_ram_waddr_bank[0]);
   always_comb sk_bank0_mem_if.wdata_i = (sk_ram_wdata[0]);
@@ -1082,6 +1175,23 @@ always_comb kv_mlkem_msg_write_data = '0;
   always_comb sk_bank1_mem_if.re_i = (sk_ram_re_bank[1]);
   always_comb sk_bank1_mem_if.raddr_i = (sk_ram_raddr_bank[1]);
   always_comb sk_ram_rdata[1] = sk_bank1_mem_if.rdata_o;
+*/
+
+  always_comb sk_bank0_mem_we_i = (sk_ram_we_bank[0]);
+  always_comb sk_bank0_mem_waddr_i = (sk_ram_waddr_bank[0]);
+  always_comb sk_bank0_mem_wdata_i = (sk_ram_wdata[0]);
+  always_comb sk_bank0_mem_re_i = (sk_ram_re_bank[0]);
+  always_comb sk_bank0_mem_raddr_i = (sk_ram_raddr_bank[0]);
+  always_comb sk_ram_rdata[0] = sk_bank0_mem_rdata_o;
+
+
+  always_comb sk_bank1_mem_we_i = (sk_ram_we_bank[1]);
+  always_comb sk_bank1_mem_waddr_i = (sk_ram_waddr_bank[1]);
+  always_comb sk_bank1_mem_wdata_i = (sk_ram_wdata[1]);
+  always_comb sk_bank1_mem_re_i = (sk_ram_re_bank[1]);
+  always_comb sk_bank1_mem_raddr_i = (sk_ram_raddr_bank[1]);
+  always_comb sk_ram_rdata[1] = sk_bank1_mem_rdata_o;
+
 
   //private key read ports
   always_ff @(posedge clk or negedge rst_b) begin
@@ -1114,6 +1224,8 @@ always_comb kv_mlkem_msg_write_data = '0;
   always_comb api_sig_z_re[0] = mldsa_valid_reg & api_sig_z_dec & ~abr_reg_hwif_out.MLDSA_SIGNATURE.req_is_wr;
   always_comb api_sig_reg_re = (api_sig_c_dec | api_sig_h_dec) & ~abr_reg_hwif_out.MLDSA_SIGNATURE.req_is_wr;
 
+
+/*
   always_comb sig_z_mem_if.we_i = (sig_z_ram_we);
   always_comb sig_z_mem_if.waddr_i = (sig_z_ram_waddr);
   always_comb sig_z_mem_if.wstrobe_i = (sig_z_ram_wstrobe);
@@ -1121,6 +1233,15 @@ always_comb kv_mlkem_msg_write_data = '0;
   always_comb sig_z_mem_if.re_i = (sig_z_ram_re);
   always_comb sig_z_mem_if.raddr_i = (sig_z_ram_raddr);
   always_comb sig_z_ram_rdata = sig_z_mem_if.rdata_o;
+*/
+
+  always_comb sig_z_mem_we_i = (sig_z_ram_we);
+  always_comb sig_z_mem_waddr_i = (sig_z_ram_waddr);
+  always_comb sig_z_mem_wstrobe_i = (sig_z_ram_wstrobe);
+  always_comb sig_z_mem_wdata_i = (sig_z_ram_wdata);
+  always_comb sig_z_mem_re_i = (sig_z_ram_re);
+  always_comb sig_z_mem_raddr_i = (sig_z_ram_raddr);
+  always_comb sig_z_ram_rdata  = sig_z_mem_rdata_o;
 
   //read requests
   always_comb sigdecode_z_ram_re[0] = sigdecode_z_rd_req_i.rd_wr_en == RW_READ;
@@ -1203,6 +1324,7 @@ always_comb kv_mlkem_msg_write_data = '0;
 
   always_comb api_pubkey_re[0] = mldsa_valid_reg & api_pubkey_dec & ~abr_reg_hwif_out.MLDSA_PUBKEY.req_is_wr;
 
+/*
   always_comb pk_mem_if.we_i = (pubkey_ram_we);
   always_comb pk_mem_if.waddr_i = (pubkey_ram_waddr);
   always_comb pk_mem_if.wstrobe_i = (pubkey_ram_wstrobe);
@@ -1210,6 +1332,16 @@ always_comb kv_mlkem_msg_write_data = '0;
   always_comb pk_mem_if.re_i = (pubkey_ram_re);
   always_comb pk_mem_if.raddr_i = (pubkey_ram_raddr);
   always_comb pubkey_ram_rdata = pk_mem_if.rdata_o;
+*/
+
+  always_comb pk_mem_we_i =  (pubkey_ram_we);
+  always_comb pk_mem_waddr_i = (pubkey_ram_waddr);
+  always_comb pk_mem_wstrobe_i = (pubkey_ram_wstrobe);
+  always_comb pk_mem_wdata_i = (pubkey_ram_wdata);
+  always_comb pk_mem_re_i = (pubkey_ram_re);
+  always_comb pk_mem_raddr_i = (pubkey_ram_raddr);
+  always_comb pubkey_ram_rdata = pk_mem_rdata_o;
+
 
   assign pubkey_ram_rdata_t1 = pubkey_ram_rdata;
 
@@ -1374,6 +1506,7 @@ always_comb kv_mlkem_msg_write_data = '0;
         MLKEM_R_ID:           msg_data <= msg_last ? {48'b0,sampler_imm} : abr_scratch_reg.mlkem_enc.sigma[sampler_src_offset[1:0]];
         MLKEM_TR_ID:          msg_data <= abr_scratch_reg.mlkem_enc.tr[sampler_src_offset[1:0]];
         MLKEM_SEED_Z_ID:      msg_data <= {abr_scratch_reg.mlkem_enc.seed_z[{sampler_src_offset[1:0],1'b1}],abr_scratch_reg.mlkem_enc.seed_z[{sampler_src_offset[1:0],1'b0}]};
+        MLDSA_CONSTANT_C:     msg_data <= {CONSTANT_VAL[{sampler_src_offset[2:0],1'b1}], CONSTANT_VAL[{sampler_src_offset[2:0],1'b0}]};
         ABR_CNT_ID:           msg_data <= counter_reg;
         default:              msg_data <= '0;
       endcase
@@ -2168,7 +2301,7 @@ abr_seq abr_seq_inst
   .data_o(abr_instr_o)
 );
 
-//NTT gasket — single command output
+//NTT gasket â single command output
 //Check if ntt is being enabled in this clock also
 always_comb begin
   ntt_busy = abr_instr.opcode.ntt_en & (ntt_busy_i | ntt_enable_o);
