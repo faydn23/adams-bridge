@@ -339,6 +339,7 @@ logic [63:0] rel_cycle;
   logic [1:0] sigdecode_h_mem_we0_bank;
   logic [1:0] decompress_mem_we0_bank;
   logic [2:1] decompress_mem_we;
+  
 
   logic [ABR_NUM_NTT-1:0][2:0] ntt_mem_re[SRAM_LATENCY:0];
   logic [ABR_NUM_NTT-1:0][2:0] pwo_a_mem_re[SRAM_LATENCY:0];
@@ -371,7 +372,7 @@ logic [63:0] rel_cycle;
    //abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank0_mem_if();
    //abr_sram_if #(.ADDR_W(SK_MEM_BANK_ADDR_W), .DATA_W(SK_MEM_BANK_DATA_W)) sk_bank1_mem_if();
    //abr_sram_be_if #(.ADDR_W(SIG_Z_MEM_ADDR_W), .DATA_W(SIG_Z_MEM_DATA_W)) sig_z_mem_if();
-   // abr_sram_be_if #(.ADDR_W(PK_MEM_ADDR_W), .DATA_W(PK_MEM_DATA_W)) pk_mem_if();
+   //abr_sram_be_if #(.ADDR_W(PK_MEM_ADDR_W), .DATA_W(PK_MEM_DATA_W)) pk_mem_if();
 
 
   logic                     sk_bank0_mem_we_i;
@@ -414,8 +415,8 @@ logic [63:0] rel_cycle;
   logic [PK_MEM_DATA_W-1:0] pk_mem_rdata_o;  
   //logic [(PK_MEM_NUM_DWORDS)-1:0][31:0] pk_mem_rdata_o;
 
-  logic [63:0] meas_cycle;
-
+  logic [63:0] meas_cycle; //debug counter
+  logic sample_in_ball_activated;  //debug timing of ntt zeroization
 
   logic [1:0][ABR_MEM_DATA_WIDTH-1:0] splitter_rand;
   logic [ABR_NUM_NTT-1:0][5:0] shuffling_rand;
@@ -678,7 +679,8 @@ abr_ctrl_inst
   .notif_intr(notif_intr),
   .debugUnlock_or_scan_mode_switch(debugUnlock_or_scan_mode_switch),
   .trigger(trigger),
-  .meas_cycle(meas_cycle)
+  .meas_cycle(meas_cycle),
+  .sample_in_ball_activated(sample_in_ball_activated)
 );
 
 always_comb zeroize_mem_we = (zeroize_mem.rd_wr_en == RW_WRITE);
@@ -870,45 +872,46 @@ generate
         end
         default: begin
         end
-     endcase
-  end
+      endcase 
+    end
     
-  logic trigger_d;
-     logic [11:0] trigger_cnt;
-     logic zeroize_pulse;
+    
+   
+    logic trigger_d;
+    logic [11:0] trigger_cnt;
+    logic zeroize_pulse;
 
-     always_ff @(posedge clk or negedge rst_b) begin
-         if (!rst_b) begin
-             trigger_d    <= 1'b0;
-             trigger_cnt  <= 12'd0;
-             zeroize_pulse <= 1'b0;
-         end else if(zeroize_reg) begin
-             trigger_d    <= 1'b0;
-             trigger_cnt  <= 12'd0;
-             zeroize_pulse <= 1'b0;
-         end else begin
-             trigger_d     <= trigger;
-             zeroize_pulse <= 1'b0;   // default
-             // Rising edge of trigger
-             if (trigger && !trigger_d) begin
-                 trigger_cnt <= 473;
-             end
-             else if (trigger_cnt != 0) begin
-                 trigger_cnt <= trigger_cnt - 1'b1;
-                 if (trigger_cnt == 1)
-                     zeroize_pulse <= 1'b1;   
+    always_ff @(posedge clk or negedge rst_b) begin
+        if (!rst_b) begin
+            trigger_d    <= 1'b0;
+            trigger_cnt  <= 12'd0;
+            zeroize_pulse <= 1'b0;
+        end else if(zeroize_reg) begin
+            trigger_d    <= 1'b0;
+            trigger_cnt  <= 12'd0;
+            zeroize_pulse <= 1'b0;
+        end else begin
+            trigger_d     <= sample_in_ball_activated; //trigger;
+            zeroize_pulse <= 1'b0;   // default
+            if (sample_in_ball_activated /*trigger*/ && !trigger_d) begin
+                trigger_cnt <= 473;
+            end
+            else if (trigger_cnt != 0) begin
+                trigger_cnt <= trigger_cnt - 1'b1;
+    
+                if (trigger_cnt == 1)
+                    zeroize_pulse <= 1'b1;   
             end
         end
-   end 
+    end 
 
-    
   ntt_top #(
     .SRAM_LATENCY(SRAM_LATENCY)
   )
   ntt_top_inst (
     .clk(clk),
     .reset_n(rst_b),
-    .zeroize(zeroize_reg || zeroize_pulse), //meas_cycle==36891), //sampler in ball -> NTT -> zeroize -> PWM -> INTT
+    .zeroize(zeroize_reg || zeroize_pulse), //meas_cycle==36890), //sampler in ball -> NTT -> zeroize -> PWM -> INTT
 
     .mode(mode[g_inst]),
     .ntt_enable(ntt_enable[g_inst]),
