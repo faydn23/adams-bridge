@@ -47,6 +47,8 @@ module abr_1r1w_be_ram #(
 
         if (re_i) begin
             rdata_o <= ram[raddr_i];
+        end else begin
+            rdata_o <= '0;
         end
     end
 
