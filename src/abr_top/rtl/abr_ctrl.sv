@@ -241,7 +241,8 @@ module abr_ctrl
   output logic error_intr,
   output logic notif_intr,
   output logic trigger,
-  output logic [63:0] meas_cycle
+  output logic [63:0] meas_cycle,
+  output logic sample_in_ball_activated
 
   );
 
@@ -640,14 +641,22 @@ always_comb kv_mlkem_msg_write_data = '0;
   //furkan-dbg-begin
   always_ff @(posedge clk or negedge rst_b) begin
      if (!rst_b) begin
-	   trigger <= 0;	
+	  trigger <= 0;
+	  sample_in_ball_activated <= 0; 	
      end else if (zeroize) begin
-	   trigger <= 0;	
+	  trigger <= 0;	
+          sample_in_ball_activated <= 0; 
      end else begin
-	   if(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
-		  trigger <= 1;
-	   if(mldsa_signature_done)
-		  trigger <= 0;
+	  if(busy_o) 
+		 trigger <= 1;
+	  if(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) begin //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
+		 //trigger <= 1;
+		 sample_in_ball_activated <= 1;
+	  end 
+	  if(mldsa_signature_done) begin
+		 trigger <= 0;
+		 sample_in_ball_activated <= 0; 
+	 end
      end
   end
   
@@ -757,7 +766,7 @@ always_comb kv_mlkem_msg_write_data = '0;
   logic [SIG_H_REG_ADDR_W-1:0] api_sig_h_addr;
   logic [ABR_REG_WIDTH-1:0] signature_reg_rdata;
 
-//public key memory
+  //public key memory
   logic pubkey_ram_we, pubkey_ram_re;
   logic [PK_MEM_ADDR_W-1:0] pubkey_ram_waddr, pubkey_ram_raddr;
   logic [PK_MEM_NUM_DWORDS-1:0][31:0] pubkey_ram_wdata, pubkey_ram_rdata;
@@ -1490,7 +1499,7 @@ always_comb kv_mlkem_msg_write_data = '0;
       unique case (sampler_src) inside
         MLDSA_SEED_ID:        msg_data <= msg_last ? {48'b0,sampler_imm} : {mldsa_seed_reg[{sampler_src_offset[1:0],1'b1}],mldsa_seed_reg[{sampler_src_offset[1:0],1'b0}]};
         MLDSA_RHO_ID:         msg_data <= msg_last ? {48'b0,sampler_imm} : abr_scratch_reg.mldsa_enc.rho[sampler_src_offset[1:0]];
-        MLDSA_CONSTANT_RHO: msg_data <= msg_last ? {48'b0, sampler_imm}  : CONSTANT_RHO_VAL[sampler_src_offset[1:0]];  //added constant rho value
+        MLDSA_CONSTANT_RHO:   msg_data <= msg_last ? {48'b0, sampler_imm}  : CONSTANT_RHO_VAL[sampler_src_offset[1:0]];  //added constant rho value
         MLDSA_RHO_P_ID:       msg_data <= msg_last ? {48'b0,sampler_imm} : abr_scratch_reg.mldsa_enc.rho_p[sampler_src_offset[2:0]];
         MLDSA_TR_ID:          msg_data <= abr_scratch_reg.mldsa_enc.tr[sampler_src_offset[2:0]];
         MLDSA_MSG_ID:         msg_data <= {msg_p_reg[{sampler_src_offset[3:0],1'b1}],msg_p_reg[{sampler_src_offset[3:0],1'b0}]};
