@@ -870,18 +870,45 @@ generate
         end
         default: begin
         end
-      endcase
-      
-      
-    end
+     endcase
+  end
+    
+  logic trigger_d;
+     logic [11:0] trigger_cnt;
+     logic zeroize_pulse;
 
+     always_ff @(posedge clk or negedge rst_b) begin
+         if (!rst_b) begin
+             trigger_d    <= 1'b0;
+             trigger_cnt  <= 12'd0;
+             zeroize_pulse <= 1'b0;
+         end else if(zeroize_reg) begin
+             trigger_d    <= 1'b0;
+             trigger_cnt  <= 12'd0;
+             zeroize_pulse <= 1'b0;
+         end else begin
+             trigger_d     <= trigger;
+             zeroize_pulse <= 1'b0;   // default
+             // Rising edge of trigger
+             if (trigger && !trigger_d) begin
+                 trigger_cnt <= 473;
+             end
+             else if (trigger_cnt != 0) begin
+                 trigger_cnt <= trigger_cnt - 1'b1;
+                 if (trigger_cnt == 1)
+                     zeroize_pulse <= 1'b1;   
+            end
+        end
+   end 
+
+    
   ntt_top #(
     .SRAM_LATENCY(SRAM_LATENCY)
   )
   ntt_top_inst (
     .clk(clk),
     .reset_n(rst_b),
-    .zeroize(zeroize_reg || meas_cycle==36891), //sampler in ball -> NTT -> zeroize -> PWM -> INTT
+    .zeroize(zeroize_reg || zeroize_pulse), //meas_cycle==36891), //sampler in ball -> NTT -> zeroize -> PWM -> INTT
 
     .mode(mode[g_inst]),
     .ntt_enable(ntt_enable[g_inst]),
