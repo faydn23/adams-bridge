@@ -1490,6 +1490,7 @@ always_comb kv_mlkem_msg_write_data = '0;
       unique case (sampler_src) inside
         MLDSA_SEED_ID:        msg_data <= msg_last ? {48'b0,sampler_imm} : {mldsa_seed_reg[{sampler_src_offset[1:0],1'b1}],mldsa_seed_reg[{sampler_src_offset[1:0],1'b0}]};
         MLDSA_RHO_ID:         msg_data <= msg_last ? {48'b0,sampler_imm} : abr_scratch_reg.mldsa_enc.rho[sampler_src_offset[1:0]];
+        MLDSA_CONSTANT_RHO: msg_data <= msg_last ? {48'b0, sampler_imm}  : CONSTANT_RHO_VAL[sampler_src_offset[1:0]];  //added constant rho value
         MLDSA_RHO_P_ID:       msg_data <= msg_last ? {48'b0,sampler_imm} : abr_scratch_reg.mldsa_enc.rho_p[sampler_src_offset[2:0]];
         MLDSA_TR_ID:          msg_data <= abr_scratch_reg.mldsa_enc.tr[sampler_src_offset[2:0]];
         MLDSA_MSG_ID:         msg_data <= {msg_p_reg[{sampler_src_offset[3:0],1'b1}],msg_p_reg[{sampler_src_offset[3:0],1'b0}]};
@@ -1507,7 +1508,7 @@ always_comb kv_mlkem_msg_write_data = '0;
         MLKEM_R_ID:           msg_data <= msg_last ? {48'b0,sampler_imm} : abr_scratch_reg.mlkem_enc.sigma[sampler_src_offset[1:0]];
         MLKEM_TR_ID:          msg_data <= abr_scratch_reg.mlkem_enc.tr[sampler_src_offset[1:0]];
         MLKEM_SEED_Z_ID:      msg_data <= {abr_scratch_reg.mlkem_enc.seed_z[{sampler_src_offset[1:0],1'b1}],abr_scratch_reg.mlkem_enc.seed_z[{sampler_src_offset[1:0],1'b0}]};
-        MLDSA_CONSTANT_C:     msg_data <= {CONSTANT_VAL[{sampler_src_offset[2:0],1'b1}], CONSTANT_VAL[{sampler_src_offset[2:0],1'b0}]};
+        MLDSA_CONSTANT_C:     msg_data <= {CONSTANT_VAL[{sampler_src_offset[2:0],1'b1}], CONSTANT_VAL[{sampler_src_offset[2:0],1'b0}]}; //added constant c value
         ABR_CNT_ID:           msg_data <= counter_reg;
         default:              msg_data <= '0;
       endcase
