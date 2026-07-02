@@ -341,8 +341,11 @@ package abr_ctrl_pkg;
     localparam [ABR_OPR_WIDTH-1 : 0] MLKEM_R_ID           = 'd34;
     localparam [ABR_OPR_WIDTH-1 : 0] MLKEM_SEED_Z_ID      = 'd35;
     localparam [ABR_OPR_WIDTH-1 : 0] MLKEM_CIPHERTEXT_ID  = 'd36;
-    localparam [ABR_OPR_WIDTH-1 : 0] MLDSA_CONSTANT_C  = 'd37; 
+    localparam [ABR_OPR_WIDTH-1 : 0] MLDSA_CONSTANT_C  = 'd37; //FA
     localparam logic [15:0][31:0] CONSTANT_VAL = 512'h357bbde78e64b7731370d445b2138d74f34697369c3889dd8170e2f3ba8d65e83a2a686c73da532dade8a8cac8bf3cb99ca25b4c0f9b0c017e1fb4d842c7ca9b;
+    
+    localparam [ABR_OPR_WIDTH-1:0] MLDSA_CONSTANT_RHO = 'd38; // FA
+    localparam logic [3:0][63:0] CONSTANT_RHO_VAL = 256'h348b1a2c3d4726a7a809b23f5c1da02f198112736415b63c18d91a3b2c1d10af;
      
     
     //SK offsets in dwords
@@ -546,7 +549,7 @@ package abr_ctrl_pkg;
     localparam [ABR_PROG_ADDR_W-1 : 0] MLDSA_SIGN_MAKE_W       = MLDSA_SIGN_MAKE_W_S+ 65;
     localparam [ABR_PROG_ADDR_W-1 : 0] MLDSA_SIGN_MAKE_C       = MLDSA_SIGN_MAKE_W+ 1;
     localparam [ABR_PROG_ADDR_W-1 : 0] MLDSA_SIGN_VALID_S      = MLDSA_SIGN_MAKE_C+ 2;
-    localparam [ABR_PROG_ADDR_W-1 : 0] MLDSA_SIGN_CHL_E        = MLDSA_SIGN_VALID_S + 133;
+    localparam [ABR_PROG_ADDR_W-1 : 0] MLDSA_SIGN_CHL_E        = MLDSA_SIGN_VALID_S + 1301;
     localparam [ABR_PROG_ADDR_W-1 : 0] MLDSA_SIGN_E            = MLDSA_SIGN_CHL_E + 1;
     //Verify
     localparam [ABR_PROG_ADDR_W-1 : 0] MLDSA_VERIFY_S          = MLDSA_SIGN_E + 2;
