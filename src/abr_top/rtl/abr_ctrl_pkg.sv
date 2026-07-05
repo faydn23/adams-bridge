@@ -30,7 +30,7 @@ package abr_ctrl_pkg;
 
     localparam integer ABR_OPR_WIDTH       = 15;
     localparam integer ABR_IMM_WIDTH       = 16;
-    localparam ABR_PROG_ADDR_W             = 10;
+    localparam ABR_PROG_ADDR_W             = 12;
 
     localparam SEED_NUM_DWORDS = 8;
     localparam MLDSA_MSG_NUM_DWORDS = 16;
@@ -70,7 +70,7 @@ package abr_ctrl_pkg;
     localparam T1_NUM_COEFF = 2048;
     localparam T1_COEFF_W = 10;
     
-    localparam LFSR_W = 102; // Each LFSR width: (2*96 + 12) / 2 — 12 shuffle bits (6 per NTT)
+    localparam LFSR_W = 102; // Each LFSR width: (2*96 + 12) / 2 - 12 shuffle bits (6 per NTT)
 
     localparam SK_MEM_DEPTH = 1192;
     localparam SK_MEM_BANK_DEPTH = SK_MEM_DEPTH/2;
@@ -341,11 +341,10 @@ package abr_ctrl_pkg;
     localparam [ABR_OPR_WIDTH-1 : 0] MLKEM_R_ID           = 'd34;
     localparam [ABR_OPR_WIDTH-1 : 0] MLKEM_SEED_Z_ID      = 'd35;
     localparam [ABR_OPR_WIDTH-1 : 0] MLKEM_CIPHERTEXT_ID  = 'd36;
-    localparam [ABR_OPR_WIDTH-1 : 0] MLDSA_CONSTANT_C  = 'd37; //FA
-    localparam logic [15:0][31:0] CONSTANT_VAL = 512'h357bbde78e64b7731370d445b2138d74f34697369c3889dd8170e2f3ba8d65e83a2a686c73da532dade8a8cac8bf3cb99ca25b4c0f9b0c017e1fb4d842c7ca9b;
-    
-    localparam [ABR_OPR_WIDTH-1:0] MLDSA_CONSTANT_RHO = 'd38; // FA
-    localparam logic [3:0][63:0] CONSTANT_RHO_VAL = 256'h348b1a2c3d4726a7a809b23f5c1da02f198112736415b63c18d91a3b2c1d10af;
+    localparam [ABR_OPR_WIDTH-1 : 0] MLDSA_CONSTANT_C     = 'd37; //FA
+    localparam logic [15:0][31:0] CONSTANT_VAL            = 512'h357bbde78e64b7731370d445b2138d74f34697369c3889dd8170e2f3ba8d65e83a2a686c73da532dade8a8cac8bf3cb99ca25b4c0f9b0c017e1fb4d842c7ca9b; //FA
+    localparam [ABR_OPR_WIDTH-1:0] MLDSA_CONSTANT_RHO     = 'd38; // FA
+    localparam logic [3:0][63:0] CONSTANT_RHO_VAL         = 256'h348b1a2c3d4726a7a809b23f5c1da02f198112736415b63c18d91a3b2c1d10af;//FA
      
     
     //SK offsets in dwords
