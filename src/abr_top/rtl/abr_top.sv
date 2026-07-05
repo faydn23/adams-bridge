@@ -894,7 +894,7 @@ generate
             trigger_d     <= sample_in_ball_activated; //trigger;
             zeroize_pulse <= 1'b0;   // default
             if (sample_in_ball_activated /*trigger*/ && !trigger_d) begin
-                trigger_cnt <= 473;
+                trigger_cnt <= 553;
             end
             else if (trigger_cnt != 0) begin
                 trigger_cnt <= trigger_cnt - 1'b1;
