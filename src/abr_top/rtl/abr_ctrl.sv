@@ -647,9 +647,9 @@ always_comb kv_mlkem_msg_write_data = '0;
 	  trigger <= 0;	
           sample_in_ball_activated <= 0; 
      end else begin
-	  if(busy_o) 
+	  if(skencode_done_i)//abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(busy_o) 
 		 trigger <= 1;
-	  if(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) begin //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
+	  if(abr_instr.opcode.mode.aux_mode==MLDSA_DECOMP) begin   //abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) begin //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
 		 //trigger <= 1;
 		 sample_in_ball_activated <= 1;
 	  end 
