@@ -87,12 +87,12 @@ module abr_top
   );
 
 
-logic busy_d;
-logic [63:0] rel_cycle;
+  logic busy_d;
+  logic [63:0] rel_cycle;
+  logic zeroize_pulse;
 
 
-
-//Signal Declarations
+ //Signal Declarations
   localparam ABR_NUM_NTT = MASKING_EN ? 2 : 1;
   // Safe array index for share[1] refs in MASKING_EN=0 dead branches (avoids VCS SIOB).
   localparam MASKED_IDX  = MASKING_EN ? 1 : 0;
