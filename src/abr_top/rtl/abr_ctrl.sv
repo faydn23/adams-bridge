@@ -242,7 +242,7 @@ module abr_ctrl
   output logic notif_intr,
   output logic trigger,
   output logic [63:0] meas_cycle,
-  output logic sample_in_ball_activated
+  output logic zeroization_external_activated
 
   );
 
@@ -638,24 +638,23 @@ always_comb kv_mlkem_msg_write_data = '0;
  
   
 
-  //furkan-dbg-begin
+ //furkan-dbg-begin
   always_ff @(posedge clk or negedge rst_b) begin
      if (!rst_b) begin
 	  trigger <= 0;
-	  sample_in_ball_activated <= 0; 	
+	  zeroization_external_activated <= 0; 	
      end else if (zeroize) begin
 	  trigger <= 0;	
-          sample_in_ball_activated <= 0; 
+          zeroization_external_activated <= 0; 
      end else begin
-	  if(skencode_done_i)//abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(busy_o) 
+	  if(skencode_done_i) 
 		 trigger <= 1;
-	  if(abr_instr.opcode.mode.aux_mode==MLDSA_DECOMP) begin   //abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) begin //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
-		 //trigger <= 1;
-		 sample_in_ball_activated <= 1;
+	  if(abr_instr.opcode.mode.aux_mode==MLDSA_DECOMP) begin //abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL)) begin //36416)//23432)//(abr_instr.opcode.sampler_en &&(sampler_mode_o == ABR_SAMPLE_IN_BALL))//(skencode_done_i)//(sampler_mode_o==MLDSA_REJ_SAMPLER) //(skencode_done_i) //(ntt_enable_o &&  (ntt_mode_o == MLDSA_INTT))//(skdecode_enable_o)//(abr_prog_cntr_nxt==10'h0a4)//if(skencode_done_i)
+		 zeroization_external_activated <= 1;
 	  end 
 	  if(mldsa_signature_done) begin
 		 trigger <= 0;
-		 sample_in_ball_activated <= 0; 
+		 zeroization_external_activated <= 0; 
 	 end
      end
   end
