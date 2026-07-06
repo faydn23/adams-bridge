@@ -416,7 +416,7 @@ logic [63:0] rel_cycle;
   //logic [(PK_MEM_NUM_DWORDS)-1:0][31:0] pk_mem_rdata_o;
 
   logic [63:0] meas_cycle; //debug counter
-  logic sample_in_ball_activated;  //debug timing of ntt zeroization
+  logic zeroization_external_activated;  //debug timing of ntt zeroization
 
   logic [1:0][ABR_MEM_DATA_WIDTH-1:0] splitter_rand;
   logic [ABR_NUM_NTT-1:0][5:0] shuffling_rand;
@@ -680,7 +680,7 @@ abr_ctrl_inst
   .debugUnlock_or_scan_mode_switch(debugUnlock_or_scan_mode_switch),
   .trigger(trigger),
   .meas_cycle(meas_cycle),
-  .sample_in_ball_activated(sample_in_ball_activated)
+  .zeroization_external_activated(zeroization_external_activated)
 );
 
 always_comb zeroize_mem_we = (zeroize_mem.rd_wr_en == RW_WRITE);
@@ -704,7 +704,7 @@ sampler_top_inst
 (
   .clk(clk),
   .rst_b(rst_b),
-  .zeroize(zeroize_reg || skdecode_enable),
+  .zeroize(zeroize_reg || skdecode_enable || zeroize_pulse),
 
   .sampler_mode_i(sampler_mode),
   .sha3_start_i(sha3_start), //start the sha3 engine
@@ -877,41 +877,14 @@ generate
     
     
    
-    logic trigger_d;
-    logic [11:0] trigger_cnt;
-    logic zeroize_pulse;
-
-    always_ff @(posedge clk or negedge rst_b) begin
-        if (!rst_b) begin
-            trigger_d    <= 1'b0;
-            trigger_cnt  <= 12'd0;
-            zeroize_pulse <= 1'b0;
-        end else if(zeroize_reg) begin
-            trigger_d    <= 1'b0;
-            trigger_cnt  <= 12'd0;
-            zeroize_pulse <= 1'b0;
-        end else begin
-            trigger_d     <= sample_in_ball_activated; //trigger;
-            zeroize_pulse <= 1'b0;   // default
-            if (sample_in_ball_activated /*trigger*/ && !trigger_d) begin
-                trigger_cnt <= 553;
-            end
-            else if (trigger_cnt != 0) begin
-                trigger_cnt <= trigger_cnt - 1'b1;
-    
-                if (trigger_cnt == 1)
-                    zeroize_pulse <= 1'b1;   
-            end
-        end
-    end 
-
+  
   ntt_top #(
     .SRAM_LATENCY(SRAM_LATENCY)
   )
   ntt_top_inst (
     .clk(clk),
     .reset_n(rst_b),
-    .zeroize(zeroize_reg || zeroize_pulse), //meas_cycle==36890), //sampler in ball -> NTT -> zeroize -> PWM -> INTT
+    .zeroize(zeroize_reg ), //meas_cycle==36890), //sampler in ball -> NTT -> zeroize -> PWM -> INTT
 
     .mode(mode[g_inst]),
     .ntt_enable(ntt_enable[g_inst]),
@@ -941,6 +914,35 @@ generate
   end
 endgenerate
 
+
+    logic trigger_d;
+    logic [12:0] trigger_cnt;
+    
+    
+    always_ff @(posedge clk or negedge rst_b) begin
+        if (!rst_b) begin
+            trigger_d    <= 1'b0;
+            trigger_cnt  <= 13'd0;
+            zeroize_pulse <= 1'b0;
+        end else if(zeroize_reg) begin
+            trigger_d    <= 1'b0;
+            trigger_cnt  <= 13'd0;
+            zeroize_pulse <= 1'b0;
+        end else begin
+            trigger_d     <= zeroization_external_activated; //trigger;
+            zeroize_pulse <= 1'b0;   // default
+            if (zeroization_external_activated && !trigger_d) begin
+                trigger_cnt <= 552; //473;
+            end
+            else if (trigger_cnt != 0) begin
+                trigger_cnt <= trigger_cnt - 1'b1;
+    
+                if (trigger_cnt == 1)
+                    zeroize_pulse <= 1'b1;   
+            end
+        end
+    end 
+    
 power2round_top
 power2round_inst (
   .clk(clk),
